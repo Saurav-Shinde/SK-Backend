@@ -10,14 +10,24 @@ connectDB()
 
 const app = express()
 
-const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:3000'
-app.use(
-  cors({
-    origin: allowedOrigin,
-    methods: ['POST', 'GET', 'PUT', 'DELETE'],
-    credentials: true,
-  })
-)
+const rawOrigins = process.env.CLIENT_ORIGIN || 'http://localhost:3000'
+const allowedOrigins = rawOrigins.split(',').map(s => s.trim()).filter(Boolean)
+
+app.use((req, res, next) => {
+  const origin = req.get('Origin')
+  if (!origin) return next() // allow non-browser requests
+  if (allowedOrigins.includes(origin)) {
+    // echo back the exact origin (required when using credentials)
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,X-Requested-With')
+    if (req.method === 'OPTIONS') return res.sendStatus(204)
+    return next()
+  }
+  return res.status(403).json({ message: 'CORS Error: Origin not allowed' })
+})
+
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
