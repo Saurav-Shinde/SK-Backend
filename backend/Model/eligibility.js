@@ -22,8 +22,8 @@ const eligibilitySchema = new mongoose.Schema(
     launchCapex: { type: String },
     smallwaresNeeded: { type: String },
 
-    activationOpportunities: { type: String, required: true },
-    domesticOpportunities: { type: String, required: true },
+    activationOpportunities: { type: [String], required: true },
+    domesticOpportunities: { type: [String], required: true },
     dspMarketingCommitment: { type: String, required: true },
 
     retrofittingNeeded: { type: String, required: true },

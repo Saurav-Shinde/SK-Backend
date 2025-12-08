@@ -1,17 +1,21 @@
+// backend/Routes/eligibilityRoutes.js
+
 import express from 'express'
 import EligibilitySubmission from '../Model/eligibility.js'
 import { scoreEligibility } from '../utils/scoreEligibility.js'
-import { generateAnalysisSummary } from '../utils/openaiService.js'
+import { generateAnalysisSummary } from '../utils/geminiService.js'
 import { sendEligibilityEmails } from '../utils/emailService.js'
 
 const router = express.Router()
 
+// Fields that should be stored as numbers
 const numericFields = ['bmDeliverySales', 'deliveryAOV', 'numberOfMenuItems']
 
 router.post('/', async (req, res) => {
   try {
     const payload = { ...req.body }
 
+    // Required fields (must be present in the request body)
     const requiredFields = [
       'brandName',
       'locationMapping',
@@ -35,47 +39,81 @@ router.post('/', async (req, res) => {
       'sublicensingPotential',
     ]
 
-    const missingField = requiredFields.find((field) => !payload[field])
+    // Basic presence check (empty string / undefined / null)
+    const missingField = requiredFields.find(
+      (field) =>
+        payload[field] === undefined ||
+        payload[field] === null ||
+        payload[field] === ''
+    )
+
     if (missingField) {
-      return res.status(400).json({ message: `Field "${missingField}" is required.` })
+      return res
+        .status(400)
+        .json({ message: `Field "${missingField}" is required.` })
     }
 
+    // Cast numeric fields
     numericFields.forEach((field) => {
-      if (payload[field] !== undefined && payload[field] !== null && payload[field] !== '') {
-        payload[field] = Number(payload[field])
+      if (
+        payload[field] !== undefined &&
+        payload[field] !== null &&
+        payload[field] !== ''
+      ) {
+        const num = Number(payload[field])
+        if (!Number.isNaN(num)) {
+          payload[field] = num
+        }
       }
     })
 
-    payload.brandName = payload.brandName.trim()
-    if (payload.submittedByEmail) {
-      payload.submittedByEmail = payload.submittedByEmail.toLowerCase()
+    // Normalize some fields
+    if (typeof payload.brandName === 'string') {
+      payload.brandName = payload.brandName.trim()
     }
 
-    // Calculate eligibility score
+    if (payload.submittedByEmail && typeof payload.submittedByEmail === 'string') {
+      payload.submittedByEmail = payload.submittedByEmail.toLowerCase().trim()
+    }
+
+    // ----------------------------------------------------
+    // 1) Calculate eligibility score
+    // ----------------------------------------------------
     const scoreResult = scoreEligibility(payload)
 
-    // Generate AI analysis summary
+    // ----------------------------------------------------
+    // 2) Generate AI analysis summary with Gemini
+    // ----------------------------------------------------
     let aiAnalysisSummary = ''
     try {
       aiAnalysisSummary = await generateAnalysisSummary(payload, scoreResult)
     } catch (error) {
       console.error('Failed to generate AI summary:', error)
-      // Continue with fallback summary (handled in openaiService)
-      aiAnalysisSummary = scoreResult.meets_threshold
-        ? `Your brand "${scoreResult.brand_name}" demonstrates excellent consistency across mapping, operations, and expansion potential. With a score of ${scoreResult.total_score_0_to_10}/10, your current scale and partner portfolio align perfectly with Skope Kitchens standards.`
-        : `We've reviewed your brand "${scoreResult.brand_name}" and identified several areas that need attention. With a score of ${scoreResult.total_score_0_to_10}/10, we recommend addressing the highlighted gaps in your profile before resubmission.`
+
+      // Last-resort fallback if Gemini helper itself throws
+      const { total_score_0_to_10, meets_threshold, brand_name } = scoreResult
+      aiAnalysisSummary = meets_threshold
+        ? `Your brand "${brand_name}" demonstrates excellent consistency across mapping, operations, and expansion potential. With a score of ${total_score_0_to_10}/10, your current scale and partner portfolio align perfectly with Skope Kitchens standards.`
+        : `We've reviewed your brand "${brand_name}" and identified several areas that need attention. With a score of ${total_score_0_to_10}/10, we recommend addressing the highlighted gaps in your profile before resubmission.`
     }
 
-    // Add scoring and AI analysis to payload
+    // ----------------------------------------------------
+    // 3) Attach scoring + AI summary to payload for DB
+    // ----------------------------------------------------
     payload.totalScore = scoreResult.total_score_0_to_10
     payload.meetsThreshold = scoreResult.meets_threshold
     payload.decision = scoreResult.decision
     payload.sectionScores = scoreResult.section_scores
     payload.aiAnalysisSummary = aiAnalysisSummary
 
+    // ----------------------------------------------------
+    // 4) Save submission to MongoDB
+    // ----------------------------------------------------
     const submission = await EligibilitySubmission.create(payload)
 
-    // Fire emails to client + internal team (do not block response on failure)
+    // ----------------------------------------------------
+    // 5) Fire emails (non-blocking for client)
+    // ----------------------------------------------------
     try {
       await sendEligibilityEmails({
         submission: payload,
@@ -86,6 +124,9 @@ router.post('/', async (req, res) => {
       console.error('Failed to send eligibility emails:', emailError)
     }
 
+    // ----------------------------------------------------
+    // 6) Respond to client
+    // ----------------------------------------------------
     res.status(201).json({
       message: 'Eligibility form submitted successfully.',
       submissionId: submission._id,
@@ -93,13 +134,14 @@ router.post('/', async (req, res) => {
       meetsThreshold: scoreResult.meets_threshold,
       decision: scoreResult.decision,
       sectionScores: scoreResult.section_scores,
-      aiAnalysisSummary: aiAnalysisSummary,
+      aiAnalysisSummary,
     })
   } catch (error) {
     console.error('Eligibility submission error:', error)
-    res.status(500).json({ message: 'Unable to submit eligibility form. Please try again.' })
+    res
+      .status(500)
+      .json({ message: 'Unable to submit eligibility form. Please try again.' })
   }
 })
 
 export default router
-
