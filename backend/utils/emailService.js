@@ -4,129 +4,78 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 const {
-  SMTP_HOST,
-  SMTP_PORT,
-  SMTP_USER,
-  SMTP_PASS,
+  GMAIL_USER,
+  GMAIL_PASS,
   EMAIL_FROM,
   INTERNAL_ELIGIBILITY_EMAIL,
 } = process.env
 
-// Internal email fallback if env not set
+// Internal fallback email
 const DEFAULT_INTERNAL_EMAIL = 'Shindesaurav03@gmail.com'
 
-// Create transporter specifically for SendGrid
+// Gmail transporter (very simple)
 const transporter = nodemailer.createTransport({
-  host: SMTP_HOST || 'smtp.sendgrid.net',
-  port: Number(SMTP_PORT) || 587,
-  secure: false, // SendGrid on 587 uses STARTTLS, so this must be false
+  service: "gmail",
   auth: {
-    user: SMTP_USER || 'apikey', // SendGrid username is always "apikey"
-    pass: SMTP_PASS,             // Your SendGrid API key
+    user: GMAIL_USER,
+    pass: GMAIL_PASS, // App password
   },
 })
 
-// Optional: verify connection at startup (useful in logs)
-transporter.verify((err, success) => {
-  if (err) {
-    console.error('SMTP connection error:', err)
-  } else {
-    console.log('SMTP server is ready to send emails')
-  }
-})
-
+// Clean & simple function to send emails
 export const sendEligibilityEmails = async ({ submission, scoreResult, aiAnalysisSummary }) => {
   const userEmail = submission.submittedByEmail
   const internalEmail = INTERNAL_ELIGIBILITY_EMAIL || DEFAULT_INTERNAL_EMAIL
 
   if (!userEmail && !internalEmail) {
-    console.warn('No recipient email configured for eligibility submission.')
+    console.warn("No recipient email configured.")
     return
   }
 
-  const { total_score_0_to_10, decision, section_scores: sectionScores } = scoreResult
+  const { total_score_0_to_10, decision, section_scores } = scoreResult
   const brandName = submission.brandName
-  const decisionLabel = decision === 'MOVE_FORWARD' ? 'Approved (>= 8.5)' : 'Needs Review'
+  const decisionLabel =
+    decision === "MOVE_FORWARD" ? "Approved (>= 8.5)" : "Needs Review"
 
-  const subjectBase = `Skope Kitchens Eligibility Result – ${brandName} (${total_score_0_to_10.toFixed(
+  // email subject
+  const subject = `Skope Kitchens Eligibility Result – ${brandName} (${total_score_0_to_10.toFixed(
     2
   )}/10, ${decisionLabel})`
 
-  const formatValue = (val) => {
-    if (Array.isArray(val)) return val.join(', ')
-    if (val === undefined || val === null || val === '') return 'Not provided'
-    return String(val)
-  }
+  // summary text
+  const textBody = `
+Brand Name: ${brandName}
+Score: ${total_score_0_to_10.toFixed(2)}/10
+Decision: ${decisionLabel}
 
-  const detailFields = [
-    ['Submitted By (email)', submission.submittedByEmail],
-    ['Brand Name', submission.brandName],
-    ['Location Mapping', submission.locationMapping],
-    ['Brand Strength / Outlets', submission.brandStrength],
-    ['Social Media Engagement', submission.socialMediaEngagement],
-    ['DSP Ratings', submission.dspRatings],
-    ['DSP Rate Type', submission.dspRateType],
-    ['B&M Delivery Sales per Day', submission.bmDeliverySales],
-    ['Delivery AOV', submission.deliveryAOV],
-    ['COGS Analysis', submission.cogsAnalysis],
-    ['Wastage Risk', submission.wastageRisk],
-    ['Number of Menu Items', submission.numberOfMenuItems],
-    ['Packaging Type', submission.packagingType],
-    ['Menu Supply Chain Complexity', submission.menuSupplyChainComplexity],
-    ['Launch Capex', submission.launchCapex],
-    ['Smallwares Needed', submission.smallwaresNeeded],
-    ['Activation Opportunities', submission.activationOpportunities],
-    ['Domestic Opportunities', submission.domesticOpportunities],
-    ['DSP Marketing Commitment', submission.dspMarketingCommitment],
-    ['Retrofitting Needed', submission.retrofittingNeeded],
-    ['Additional Space Required', submission.additionalSpaceRequired],
-    ['Procurement Suppliers', submission.procurementSuppliers],
-    ['Multiple Deliveries', submission.multipleDeliveries],
-    ['Additional Training / Travel', submission.additionalTrainingTravel],
-    ['Launch Travel Costs', submission.launchTravelCosts],
-    ['Special Reporting Integrations', submission.specialReportingIntegrations],
-    ['Equipment Availability', submission.equipmentAvailability],
-    ['Skope Partner Relationships', submission.skopePartnerRelationships],
-    ['Sublicensing Potential', submission.sublicensingPotential],
-  ]
+AI Summary:
+${aiAnalysisSummary}
 
-  const summaryLines = [
-    `Brand Name: ${brandName}`,
-    `Score: ${total_score_0_to_10.toFixed(2)}/10`,
-    `Decision: ${decisionLabel}`,
-    '',
-    'AI Analysis Summary:',
-    aiAnalysisSummary,
-    '',
-    'Section Scores:',
-    `- Mapping: ${(sectionScores?.mapping?.normalized * 100 || 0).toFixed(1)}%`,
-    `- Operating: ${(sectionScores?.operating?.normalized * 100 || 0).toFixed(1)}%`,
-    `- Expansion: ${(sectionScores?.expansion?.normalized * 100 || 0).toFixed(1)}%`,
-    `- Special Conditions: ${(sectionScores?.special_conditions?.normalized * 100 || 0).toFixed(1)}%`,
-    '',
-    'Submitted Details:',
-    ...detailFields.map(([label, value]) => `- ${label}: ${formatValue(value)}`),
-  ]
+Section Scores:
+- Mapping: ${(section_scores.mapping.normalized * 100).toFixed(1)}%
+- Operating: ${(section_scores.operating.normalized * 100).toFixed(1)}%
+- Expansion: ${(section_scores.expansion.normalized * 100).toFixed(1)}%
+- Special Conditions: ${(section_scores.special_conditions.normalized * 100).toFixed(1)}%
 
-  const textBody = summaryLines.join('\n')
+Submitted Details:
+${Object.entries(submission)
+  .map(([key, val]) => `- ${key}: ${Array.isArray(val) ? val.join(", ") : val}`)
+  .join("\n")}
+`
 
-  const sendOne = async (to, isInternal = false) => {
+  const send = async (to) => {
     if (!to) return
     await transporter.sendMail({
-      from: EMAIL_FROM || SMTP_USER || 'no-reply@yourdomain.com',
+      from: EMAIL_FROM || GMAIL_USER,
       to,
-      subject: isInternal ? `[INTERNAL] ${subjectBase}` : subjectBase,
+      subject,
       text: textBody,
     })
   }
 
-  // Send to client
-  if (userEmail) {
-    await sendOne(userEmail, false)
-  }
+  // Send to the user
+  if (userEmail) await send(userEmail)
 
   // Send to internal team
-  if (internalEmail) {
-    await sendOne(internalEmail, true)
-  }
+  if (internalEmail) await send(internalEmail)
 }
