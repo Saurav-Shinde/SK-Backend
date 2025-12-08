@@ -3,14 +3,30 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 dotenv.config()
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+
+if (!GEMINI_API_KEY) {
+  console.warn('GEMINI_API_KEY not found — AI summaries will fallback.')
+}
+
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
 export const generateAnalysisSummary = async (formData, scoreResult) => {
   const { total_score_0_to_10, meets_threshold, section_scores, brand_name } = scoreResult
   const isApproved = meets_threshold && total_score_0_to_10 >= 8.5
 
   try {
-    // Build context from form data
+    // Fix array fields (Gemini fails if array is passed directly)
+    const activation = Array.isArray(formData.activationOpportunities)
+      ? formData.activationOpportunities.join(', ')
+      : formData.activationOpportunities || 'Not specified'
+
+    const domestic = Array.isArray(formData.domesticOpportunities)
+      ? formData.domesticOpportunities.join(', ')
+      : formData.domesticOpportunities || 'Not specified'
+
+    // Build context
     const context = `
 Brand Name: ${brand_name}
 Number of Outlets: ${formData.brandStrength || 'Not specified'}
@@ -22,8 +38,8 @@ COGS Analysis: ${formData.cogsAnalysis || 'Not specified'}
 Wastage Risk: ${formData.wastageRisk || 'Not specified'}
 Number of Menu Items: ${formData.numberOfMenuItems || 'Not specified'}
 Packaging Type: ${formData.packagingType || 'Not specified'}
-Activation Opportunities: ${formData.activationOpportunities || 'Not specified'}
-Domestic Opportunities: ${formData.domesticOpportunities || 'Not specified'}
+Activation Opportunities: ${activation}
+Domestic Opportunities: ${domestic}
 Retrofitting Needed: ${formData.retrofittingNeeded || 'Not specified'}
 Multiple Deliveries: ${formData.multipleDeliveries || 'Not specified'}
 Equipment Availability: ${formData.equipmentAvailability || 'Not specified'}
@@ -38,67 +54,61 @@ Section Scores:
 `
 
     const prompt = isApproved
-      ? `You are a professional business analyst specializing in food service and cloud kitchen partnerships.
+      ? `
+You are a professional business analyst for Skope Kitchens.
 
-A brand has been evaluated and scored ${total_score_0_to_10.toFixed(
+A brand scored ${total_score_0_to_10.toFixed(
           2
-        )}/10, which meets the approval threshold (≥ 8.5).
+        )}/10 (above approval threshold ≥8.5).
 
 ${context}
-
 ${sectionBreakdown}
 
-Generate a personalized, professional analysis summary (2–3 paragraphs, 150–200 words) that:
-1. Congratulates the brand on their strong performance.
-2. Highlights their key strengths based on the provided data.
-3. Mentions specific positive aspects from their submission (outlets, sales, ratings, etc.).
-4. Emphasizes alignment with Skope Kitchens standards.
-5. Is warm, professional, and encouraging.
+Write a 150–200 word summary that:
+- Congratulates the brand
+- Highlights strengths with specifics
+- Reinforces alignment with Skope Kitchens
+- Is warm, professional, and encouraging
+- NO improvement suggestions (they are approved)
 
-Write in second person (“Your brand…”, “You have…”). Be specific about their strengths. Do NOT include suggestions for improvement since they are approved.`
-      : `You are a professional business analyst specializing in food service and cloud kitchen partnerships.
+Write in second person (“Your brand…”, “You have…”).
+`
+      : `
+You are a professional business analyst for Skope Kitchens.
 
-A brand has been evaluated and scored ${total_score_0_to_10.toFixed(
+A brand scored ${total_score_0_to_10.toFixed(
           2
-        )}/10, which is below the approval threshold (8.5).
+        )}/10 (below threshold 8.5).
 
 ${context}
-
 ${sectionBreakdown}
 
-Generate a personalized, professional analysis summary (2–3 paragraphs, 150–200 words) that:
-1. Acknowledges their submission professionally.
-2. Identifies specific areas that need improvement based on the provided data.
-3. Points out weaknesses in mapping, operations, or special conditions.
-4. Provides constructive feedback without being discouraging.
-5. Encourages them to address gaps and resubmit.
+Write a 150–200 word summary that:
+- Acknowledges their effort
+- Identifies exact improvement areas
+- Provides constructive, actionable feedback
+- Encourages them to resubmit
+- NO harsh tone
 
-Write in second person (“Your brand…”, “We noticed…”). Be specific about areas needing improvement. Focus on actionable feedback.`
+Write in second person (“Your brand…”, “We noticed…”).
+`
 
-    // Use Gemini 1.5 Flash (fast & cheap) – you can switch to "gemini-1.5-pro" if you want
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    // ---- FIXED GEMINI REQUEST ----
+    const result = await model.generateContent([
+      { role: 'user', parts: [{ text: prompt }] }
+    ])
 
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    const summary = response.text()?.trim()
+    const text = result.response.text().trim()
 
-    if (!summary) {
-      throw new Error('Gemini did not return a summary')
-    }
+    if (!text) throw new Error('Gemini returned empty response')
 
-    return summary
+    return text
   } catch (error) {
     console.error('Gemini API error:', error)
 
-    // Same fallback behavior as before
-    if (isApproved) {
-      return `Your brand "${brand_name}" demonstrates excellent consistency across mapping, operations, and expansion potential. With a score of ${total_score_0_to_10.toFixed(
-        2
-      )}/10, your current scale and partner portfolio align perfectly with Skope Kitchens standards.`
-    } else {
-      return `We've reviewed your brand "${brand_name}" and identified several areas that need attention. With a score of ${total_score_0_to_10.toFixed(
-        2
-      )}/10, we recommend addressing the highlighted gaps in your profile before resubmission.`
-    }
+    // fallback text
+    return isApproved
+      ? `Your brand "${brand_name}" performed strongly with a score of ${total_score_0_to_10}/10, demonstrating excellent alignment with Skope Kitchens standards.`
+      : `Your brand "${brand_name}" scored ${total_score_0_to_10}/10. Some areas require improvement before approval.`
   }
 }
