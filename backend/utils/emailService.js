@@ -6,25 +6,33 @@ dotenv.config()
 const {
   SMTP_HOST,
   SMTP_PORT,
-  SMTP_SECURE,
   SMTP_USER,
   SMTP_PASS,
   EMAIL_FROM,
   INTERNAL_ELIGIBILITY_EMAIL,
 } = process.env
+
 // Internal email fallback if env not set
 const DEFAULT_INTERNAL_EMAIL = 'Shindesaurav03@gmail.com'
 
+// Create transporter specifically for SendGrid
 const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
+  host: SMTP_HOST || 'smtp.sendgrid.net',
   port: Number(SMTP_PORT) || 587,
-  secure: SMTP_SECURE === 'true',
-  auth: SMTP_USER
-    ? {
-        user: SMTP_USER,
-        pass: SMTP_PASS,
-      }
-    : undefined,
+  secure: false, // SendGrid on 587 uses STARTTLS, so this must be false
+  auth: {
+    user: SMTP_USER || 'apikey', // SendGrid username is always "apikey"
+    pass: SMTP_PASS,             // Your SendGrid API key
+  },
+})
+
+// Optional: verify connection at startup (useful in logs)
+transporter.verify((err, success) => {
+  if (err) {
+    console.error('SMTP connection error:', err)
+  } else {
+    console.log('SMTP server is ready to send emails')
+  }
 })
 
 export const sendEligibilityEmails = async ({ submission, scoreResult, aiAnalysisSummary }) => {
@@ -105,7 +113,7 @@ export const sendEligibilityEmails = async ({ submission, scoreResult, aiAnalysi
   const sendOne = async (to, isInternal = false) => {
     if (!to) return
     await transporter.sendMail({
-      from: EMAIL_FROM || SMTP_USER,
+      from: EMAIL_FROM || SMTP_USER || 'no-reply@yourdomain.com',
       to,
       subject: isInternal ? `[INTERNAL] ${subjectBase}` : subjectBase,
       text: textBody,
@@ -122,5 +130,3 @@ export const sendEligibilityEmails = async ({ submission, scoreResult, aiAnalysi
     await sendOne(internalEmail, true)
   }
 }
-
-
