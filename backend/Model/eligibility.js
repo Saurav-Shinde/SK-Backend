@@ -18,7 +18,7 @@ const eligibilitySchema = new mongoose.Schema(
     wastageRisk: { type: String, required: true },
     numberOfMenuItems: { type: Number, required: true },
     packagingType: { type: String, required: true },
-    menuSupplyChainComplexity: { type: String },
+    menuSupplyChainComplexity: { type: [String]},
     launchCapex: { type: String },
     smallwaresNeeded: { type: String },
 
