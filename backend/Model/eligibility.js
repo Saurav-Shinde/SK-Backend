@@ -2,41 +2,65 @@ import mongoose from 'mongoose'
 
 const eligibilitySchema = new mongoose.Schema(
   {
+    // Meta
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     submittedByEmail: { type: String, default: null },
 
+    // Mapping
     brandName: { type: String, required: true },
     locationMapping: { type: String, required: true },
     brandStrength: { type: String, required: true },
     socialMediaEngagement: { type: String, required: true },
-    dspRatings: { type: String, required: true },
 
+    swiggyRating: { type: Number, default: null },
+    zomatoRating: { type: Number, default: null },
+    // optional legacy combined field
+    dspRatings: { type: String, default: null },
+
+    // Operating
     bmDeliverySales: { type: Number, required: true },
     deliveryAOV: { type: Number, required: true },
     cogsAnalysis: { type: String, required: true },
-    dspRateType: { type: String, required: true },
+
+    dspRateType: { type: String, required: true },      // exclusive / nonExclusive / mixed
+    dspRatePercent: { type: String, default: null },    // only required for some types (handled in route/frontend)
+
     wastageRisk: { type: String, required: true },
+
     numberOfMenuItems: { type: Number, required: true },
     packagingType: { type: String, required: true },
-    menuSupplyChainComplexity: { type: [String]},
-    launchCapex: { type: String },
-    smallwaresNeeded: { type: String },
 
+    menuSupplyChainComplexity: { type: [String], required: true },
+
+    launchCapex: { type: String, required: true },      // yes / no
+    launchCapexPieces: { type: String, default: null }, // only when launchCapex === 'yes'
+
+    // Smallwares
+    smallwaresNeeded: { type: String, default: null },  // legacy, optional
+    smallwaresCost: { type: String, required: true },
+
+    // Expansion
     activationOpportunities: { type: [String], required: true },
     domesticOpportunities: { type: [String], required: true },
     dspMarketingCommitment: { type: String, required: true },
 
+    // Special Conditions
     retrofittingNeeded: { type: String, required: true },
-    additionalSpaceRequired: { type: String },
-    procurementSuppliers: { type: String },
+    additionalSpaceRequired: { type: String, required: true },
+    procurementSuppliers: { type: String, required: true },
     multipleDeliveries: { type: String, required: true },
-    additionalTrainingTravel: { type: String },
-    launchTravelCosts: { type: String },
-    specialReportingIntegrations: { type: String },
+    additionalTrainingTravel: { type: String, required: true },
+    launchTravelCosts: { type: String, required: true },
+    specialReportingIntegrations: { type: String, required: true },
     equipmentAvailability: { type: String, required: true },
 
-    skopePartnerRelationships: { type: String, required: true },
-    sublicensingPotential: { type: String, required: true },
+    // Additional Considerations
+    // ⬇️ these two are REMOVED
+    // skopePartnerRelationships: { type: String, required: true },
+    // sublicensingPotential: { type: String, required: true },
+
+    // New meta field
+    howDidYouHear: { type: String, required: true },
 
     // Scoring and AI Analysis
     totalScore: { type: Number },
@@ -54,4 +78,3 @@ const eligibilitySchema = new mongoose.Schema(
 )
 
 export default mongoose.model('EligibilitySubmission', eligibilitySchema)
-

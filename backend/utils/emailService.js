@@ -101,8 +101,10 @@ export const sendEligibilityEmails = async ({
     ['Location Mapping', submission.locationMapping],
     ['Brand Strength / Outlets', submission.brandStrength],
     ['Social Media Engagement', submission.socialMediaEngagement],
-    ['DSP Ratings', submission.dspRatings],
+    ['Swiggy Rating', submission.swiggyRating],
+    ['Zomato Rating', submission.zomatoRating],
     ['DSP Rate Type', submission.dspRateType],
+    ['DSP Rate Percent', submission.dspRatePercent],
     ['B&M Delivery Sales per Day', submission.bmDeliverySales],
     ['Delivery AOV', submission.deliveryAOV],
     ['COGS Analysis', submission.cogsAnalysis],
@@ -111,7 +113,8 @@ export const sendEligibilityEmails = async ({
     ['Packaging Type', submission.packagingType],
     ['Menu Supply Chain Complexity', submission.menuSupplyChainComplexity],
     ['Launch Capex', submission.launchCapex],
-    ['Smallwares Needed', submission.smallwaresNeeded],
+    ['Launch Capex Pieces', submission.launchCapexPieces],
+    ['Smallwares Cost', submission.smallwaresCost],
     ['Activation Opportunities', submission.activationOpportunities],
     ['Domestic Opportunities', submission.domesticOpportunities],
     ['DSP Marketing Commitment', submission.dspMarketingCommitment],
@@ -123,8 +126,7 @@ export const sendEligibilityEmails = async ({
     ['Launch Travel Costs', submission.launchTravelCosts],
     ['Special Reporting Integrations', submission.specialReportingIntegrations],
     ['Equipment Availability', submission.equipmentAvailability],
-    ['Skope Partner Relationships', submission.skopePartnerRelationships],
-    ['Sublicensing Potential', submission.sublicensingPotential],
+    ['How did you hear about us', submission.howDidYouHear],
   ]
 
   const summaryLines = [

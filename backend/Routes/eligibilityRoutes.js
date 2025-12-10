@@ -21,7 +21,6 @@ router.post('/', async (req, res) => {
       'locationMapping',
       'brandStrength',
       'socialMediaEngagement',
-      'dspRatings',
       'bmDeliverySales',
       'deliveryAOV',
       'cogsAnalysis',
@@ -35,8 +34,7 @@ router.post('/', async (req, res) => {
       'retrofittingNeeded',
       'multipleDeliveries',
       'equipmentAvailability',
-      'skopePartnerRelationships',
-      'sublicensingPotential',
+      'howDidYouHear',
     ]
 
     // Basic presence check (empty string / undefined / null)
