@@ -53,13 +53,6 @@ const eligibilitySchema = new mongoose.Schema(
     launchTravelCosts: { type: String, required: true },
     specialReportingIntegrations: { type: String, required: true },
     equipmentAvailability: { type: String, required: true },
-
-    // Additional Considerations
-    // ⬇️ these two are REMOVED
-    // skopePartnerRelationships: { type: String, required: true },
-    // sublicensingPotential: { type: String, required: true },
-
-    // New meta field
     howDidYouHear: { type: String, required: true },
 
     // Scoring and AI Analysis
