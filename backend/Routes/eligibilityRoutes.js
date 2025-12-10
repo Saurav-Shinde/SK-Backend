@@ -9,7 +9,7 @@ import { sendEligibilityEmails } from '../utils/emailService.js'
 const router = express.Router()
 
 // Fields that should be stored as numbers
-const numericFields = ['bmDeliverySales', 'deliveryAOV', 'numberOfMenuItems']
+const numericFields = ['deliveryAOV', 'numberOfMenuItems']
 
 router.post('/', async (req, res) => {
   try {

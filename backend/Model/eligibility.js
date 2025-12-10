@@ -18,7 +18,7 @@ const eligibilitySchema = new mongoose.Schema(
     dspRatings: { type: String, default: null },
 
     // Operating
-    bmDeliverySales: { type: Number, required: true },
+    bmDeliverySales: { type: String, required: true },
     deliveryAOV: { type: Number, required: true },
     cogsAnalysis: { type: String, required: true },
 
